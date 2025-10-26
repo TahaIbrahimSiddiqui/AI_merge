@@ -10,14 +10,31 @@ try:
 except Exception:
     genai = None
 
-DEFAULT_PROMPT = """You are a strict matching engine.
-Task: Given a query string and a candidate list, pick the best single candidate by semantic similarity, spelling closeness, naming variations, ocr errors, phonentic errors and time period context .
-Return a JSON object strictly:
-{"best_index": int, "best_candidate": string, "confidence": int}
-Rules:
-- best_index is 0-based in the given candidates; -1 if none is plausible.
-- confidence 0-100.
-- Use only provided candidates.
+DEFAULT_PROMPT = """You are a highly advanced name matching engine. Your task is to find the best match for a given query from a list of candidates. You can do many to many matches, one to many matches, and many to one matches based on semantic, lexical, phonetic, and contextual similarities.
+You must evaluate candidates based on a combination of the following factors:
+Semantic Similarity: The meaning and context of the words.
+Lexical & Phonetic Similarity: Consider spelling closeness (typos), as well as how the names sound, even when spelled differently across languages (e.g., "Marseille" vs. "Marsella").
+Naming Variations: Intelligently recognize and expand abbreviations, acronyms, and short forms into their full names (e.g., "JFK" for "John F. Kennedy", "St. Petersburg" for "Saint Petersburg").
+Contextual Knowledge: Apply your understanding of cultural and historical context, such as places that have changed names over time (e.g., "Bombay" and "Mumbai" refer to the same city).
+Output Rules:
+Your output must be a single, raw JSON object and nothing else.
+The JSON object must strictly adhere to the following structure:
+code
+JSON
+{
+  "best_index": <int>,
+  "best_candidate": "<string>",
+  "confidence": <int>,
+  "explanation": "<string>"
+}
+Field Definitions:
+best_index: The 0-based index of the best matching candidate from the provided list. Use -1 if no plausible match is found.
+best_candidate: The exact string of the best candidate from the list. If no match is found, this should be null.
+confidence: An integer from 0 to 100 representing your confidence in the match.
+explanation: A brief, one-sentence justification for your choice, explaining the core reason for the match (e.g., "Historical name for the same city.").
+Constraints:
+You must STRICTLY only choose a candidate from the provided list.
+Prioritize high-confidence matches. If no candidate is a strong match, it is better to return an index of -1 than to make a low-confidence guess.
 
 Query: "{query}"
 
@@ -49,6 +66,7 @@ def gemini_select_best(
     api_key = api_key or os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("Set GEMINI_API_KEY or pass api_key.")
+
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(model_name)
     prompt = DEFAULT_PROMPT.format(
@@ -62,11 +80,10 @@ def gemini_select_best(
     conf = data.get("confidence", 0)
     if not isinstance(best_index, int):
         best_index = -1
-    if not isinstance(conf, int):
-        try:
-            conf = int(conf)
-        except Exception:
-            conf = 0
+    try:
+        conf = int(conf)
+    except Exception:
+        conf = 0
     best_candidate = candidates[best_index] if 0 <= best_index < len(candidates) else None
     return best_index, best_candidate, conf
 
@@ -78,21 +95,17 @@ def gemini_batch_select(
     temperature: float = 0.2,
     max_workers: int = 8,
     show_progress: bool = True,
-) -> List[Tuple[int, Optional[str], int]]:
-    # Parallel batched calls with progress bar
+):
     results = [None] * len(queries)
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = {
-            ex.submit(
-                gemini_select_best, queries[i], candidate_lists[i],
-                api_key, model_name, temperature
-            ): i
+            ex.submit(gemini_select_best, queries[i], candidate_lists[i], api_key, model_name, temperature): i
             for i in range(len(queries))
         }
-        it = as_completed(futures)
+        iterator = as_completed(futures)
         if show_progress:
-            it = tqdm(it, total=len(futures), desc="Gemini matching", unit="row")
-        for fut in it:
+            iterator = tqdm(iterator, total=len(futures), desc="Gemini matching", unit="row")
+        for fut in iterator:
             i = futures[fut]
             try:
                 results[i] = fut.result()
