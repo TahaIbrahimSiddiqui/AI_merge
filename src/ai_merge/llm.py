@@ -31,10 +31,10 @@ Field Definitions:
 best_index: The 0-based index of the best matching candidate from the provided list. Use -1 if no plausible match is found.
 best_candidate: The exact string of the best candidate from the list. If no match is found, this should be null.
 confidence: An integer from 0 to 100 representing your confidence in the match.
-explanation: A brief, one-sentence justification for your choice, explaining the core reason for the match (e.g., "Historical name for the same city.").
 Constraints:
 You must STRICTLY only choose a candidate from the provided list.
 Prioritize high-confidence matches. If no candidate is a strong match, it is better to return an index of -1 than to make a low-confidence guess.
+Return with given id for both sides of the dataset
 
 Query: "{query}"
 
