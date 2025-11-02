@@ -75,11 +75,10 @@ def _apply_exact_stage(
         right_on=r_on,
         how="left",
         suffixes=("", "__rdupe"),
-        indicator=True  # ADD THIS to track merge type
+        indicator=True
     )
     
-    # IMPORTANT FIX: Only keep rows that actually matched
-    # Filter out rows where merge created many-to-many matches
+    # Only keep rows that actually matched
     matched_rows = merged[merged["_merge"] == "both"].copy()
     
     if matched_rows.empty:
@@ -89,8 +88,7 @@ def _apply_exact_stage(
     matched_rows.sort_values(by=["_left_index", "_right_index"], inplace=True)
     first_match = matched_rows.drop_duplicates(subset="_left_index", keep="first").set_index("_left_index")
     
-    # CRITICAL: Check if we have actual 1:1 or many:1 matches
-    # If we have too many matches per left row, this stage is too broad
+    # Check if we have many-to-many matches
     matches_per_left = matched_rows.groupby("_left_index").size()
     if (matches_per_left > 1).any():
         if show_progress:
@@ -100,19 +98,23 @@ def _apply_exact_stage(
     # Write outputs for rows that matched
     matched_indices = first_match.index
     if len(matched_indices) > 0:
-        left.loc[matched_indices, "matched_right_index"] = first_match.loc[matched_indices, "_right_index"].astype("Int64")
+        # FIXED: Store right indices as a series first
+        right_indices = first_match["_right_index"].astype("Int64")
+        
+        left.loc[matched_indices, "matched_right_index"] = right_indices
         left.loc[matched_indices, "match_type"] = "exact"
         left.loc[matched_indices, "match_stage"] = int(stage_idx)
         left.loc[matched_indices, "match_confidence"] = pd.NA
         
-        # Pull selected right columns
+        # FIXED: Pull selected right columns using proper indexing
         for col in right_cols_to_return:
             if col in right.columns:
                 if col not in left.columns:
                     left[col] = pd.NA
-                left.loc[matched_indices, col] = right.loc[
-                    first_match.loc[matched_indices, "_right_index"], col
-                ].values
+                # Create a mapping from left index to right value
+                for left_idx in matched_indices:
+                    right_idx = int(first_match.loc[left_idx, "_right_index"])
+                    left.at[left_idx, col] = right.at[right_idx, col]
     
     return left
 
