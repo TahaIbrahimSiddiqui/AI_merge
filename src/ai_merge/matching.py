@@ -68,34 +68,51 @@ def _apply_exact_stage(
     l_on = [left_norm_map[lc] for lc in left_cols]
     r_on = [right_norm_map[rc] for rc in right_cols]
     
-    # Fixed: Remove walrus operator and duplicate columns
+    # Merge
     merged = lmerge.merge(
         rmerge[[*r_on, "_right_index", *right_cols_to_return]],
         left_on=l_on, 
         right_on=r_on,
         how="left",
         suffixes=("", "__rdupe"),
+        indicator=True  # ADD THIS to track merge type
     )
     
-    # Keep first right match per left row (deterministic)
-    merged.sort_values(by=["_left_index", "_right_index"], inplace=True)
-    first_match = merged.drop_duplicates(subset="_left_index", keep="first").set_index("_left_index")
+    # IMPORTANT FIX: Only keep rows that actually matched
+    # Filter out rows where merge created many-to-many matches
+    matched_rows = merged[merged["_merge"] == "both"].copy()
+    
+    if matched_rows.empty:
+        return left  # No matches in this stage
+    
+    # For many-to-one matches, keep first right match per left row
+    matched_rows.sort_values(by=["_left_index", "_right_index"], inplace=True)
+    first_match = matched_rows.drop_duplicates(subset="_left_index", keep="first").set_index("_left_index")
+    
+    # CRITICAL: Check if we have actual 1:1 or many:1 matches
+    # If we have too many matches per left row, this stage is too broad
+    matches_per_left = matched_rows.groupby("_left_index").size()
+    if (matches_per_left > 1).any():
+        if show_progress:
+            max_matches = matches_per_left.max()
+            print(f"  Warning: Stage {stage_idx} has many-to-many matches (up to {max_matches} per row)")
     
     # Write outputs for rows that matched
-    matched = first_match["_right_index"].notna()
-    if matched.any():
-        left.loc[matched.index, "matched_right_index"] = first_match.loc[matched.index, "_right_index"].astype("Int64")
-        left.loc[matched.index, "match_type"] = "exact"
-        left.loc[matched.index, "match_stage"] = int(stage_idx)
-        left.loc[matched.index, "match_confidence"] = pd.NA
+    matched_indices = first_match.index
+    if len(matched_indices) > 0:
+        left.loc[matched_indices, "matched_right_index"] = first_match.loc[matched_indices, "_right_index"].astype("Int64")
+        left.loc[matched_indices, "match_type"] = "exact"
+        left.loc[matched_indices, "match_stage"] = int(stage_idx)
+        left.loc[matched_indices, "match_confidence"] = pd.NA
         
         # Pull selected right columns
         for col in right_cols_to_return:
             if col in right.columns:
-                # Fixed: Initialize column if doesn't exist
                 if col not in left.columns:
                     left[col] = pd.NA
-                left.loc[matched.index, col] = right.loc[first_match.loc[matched.index, "_right_index"], col].values
+                left.loc[matched_indices, col] = right.loc[
+                    first_match.loc[matched_indices, "_right_index"], col
+                ].values
     
     return left
 

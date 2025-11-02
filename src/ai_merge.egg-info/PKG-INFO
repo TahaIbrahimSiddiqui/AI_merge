@@ -1,0 +1,35 @@
+Metadata-Version: 2.4
+Name: ai-merge
+Version: 0.0.1
+Summary: Fuzzy Merging Algorithm using LLM
+Author-email: Taha Ibrahim Siddiqui <taha.i.siddiQ@gmail.com>, Asad Tariq <asad@example.com>
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/yourusername/ai-merge
+Project-URL: Issues, https://github.com/yourusername/ai-merge/issues
+Project-URL: Documentation, https://github.com/yourusername/ai-merge#readme
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Scientific/Engineering
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pandas>=1.5.0
+Requires-Dist: numpy>=1.23.0
+Requires-Dist: tqdm>=4.66.0
+Requires-Dist: google-generativeai>=0.7.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Requires-Dist: mypy>=1.0.0; extra == "dev"
+Requires-Dist: pandas-stubs>=2.0.0; extra == "dev"
+Dynamic: license-file

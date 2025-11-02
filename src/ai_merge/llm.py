@@ -4,7 +4,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional, Tuple
 from tqdm.auto import tqdm
-
+import logging
 try:
     import google.generativeai as genai
 except Exception:
@@ -84,7 +84,12 @@ def gemini_select_best(
         conf = int(conf)
     except Exception:
         conf = 0
-    best_candidate = candidates[best_index] if 0 <= best_index < len(candidates) else None
+    if 0 <= best_index < len(candidates):
+       best_candidate = candidates[best_index]
+    else:
+       if best_index != -1:  # Only log if not intentional "no match"
+        logging.warning(f"LLM returned invalid index {best_index} for {len(candidates)} candidates")
+        best_candidate = None
     return best_index, best_candidate, conf
 
 def gemini_batch_select(
@@ -109,6 +114,8 @@ def gemini_batch_select(
             i = futures[fut]
             try:
                 results[i] = fut.result()
-            except Exception:
+            except Exception as e:
+                if show_progress:
+                    tqdm.write(f"Error processing query {i}: {str(e)}")
                 results[i] = (-1, None, 0)
     return results
